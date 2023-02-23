@@ -135,29 +135,29 @@ function, which does not require the labels do be found in the context.''')
         return self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.test_dataset['input_ids'])
 
 
-def parse(text_to_label, prelabeled_text=None, output_metrics=False):
-    assert isinstance(text_to_label, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-    assert 'prompt' in text_to_label.columns and 'context' in text_to_label.columns, \
+def parse(to_parse, labeled_examples=None, output_metrics=False):
+    assert isinstance(to_parse, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+    assert 'prompt' in to_parse.columns and 'context' in to_parse.columns, \
         'Make sure the prompt column in your pandas DataFrame is named "prompt" and the context column is named "context".'
 
-    if prelabeled_text is not None:
-        assert isinstance(prelabeled_text, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-        assert 'prompt' in prelabeled_text.columns and 'context' in prelabeled_text.columns and 'label' in prelabeled_text.columns, \
+    if labeled_examples is not None:
+        assert isinstance(labeled_examples, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+        assert 'prompt' in labeled_examples.columns and 'context' in labeled_examples.columns and 'label' in labeled_examples.columns, \
             'Make sure the prompt column in your pandas DataFrame is named "prompt", the context column is named "context", and the label column is named "label".'
     if output_metrics:
-        assert prelabeled_text is not None, 'In order to output an estimate of performance with output_metrics, prelabeled_text must be provided.'
+        assert labeled_examples is not None, 'In order to output an estimate of performance with output_metrics, labeled_examples must be provided.'
 
-    if prelabeled_text is None:
-        parse_task_out = ParsingTask(None, None, text_to_label)
+    if labeled_examples is None:
+        parse_task_out = ParsingTask(None, None, to_parse)
         pred_results = parse_task_out.predict()
     else:
-        assert len(prelabeled_text) >= 2, 'At least 2 rows of prelabeled data must be given.'
-        train, val = train_test_split(prelabeled_text, test_size=0.2)
-        parse_task_out = ParsingTask(train, val, text_to_label)
+        assert len(labeled_examples) >= 2, 'At least 2 rows of prelabeled data must be given.'
+        train, val = train_test_split(labeled_examples, test_size=0.2)
+        parse_task_out = ParsingTask(train, val, to_parse)
         parse_task_out.train()
         pred_results = parse_task_out.predict()
     
-    results = text_to_label.copy()
+    results = to_parse.copy()
     results['label_from_tailwiz'] = pred_results
 
     if output_metrics:

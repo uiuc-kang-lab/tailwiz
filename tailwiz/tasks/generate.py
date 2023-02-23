@@ -92,28 +92,28 @@ class GenerateTask(Task):
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
-def generate(text_to_label, prelabeled_text=None, output_metrics=False):
-    assert isinstance(text_to_label, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-    assert 'prompt' in text_to_label.columns, \
+def generate(to_generate, labeled_examples=None, output_metrics=False):
+    assert isinstance(to_generate, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+    assert 'prompt' in to_generate.columns, \
         'Make sure the prompt column in your pandas DataFrame is named "prompt".'
-    if prelabeled_text is not None:
-        assert isinstance(prelabeled_text, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-        assert 'prompt' in prelabeled_text.columns and 'label' in prelabeled_text.columns, \
+    if labeled_examples is not None:
+        assert isinstance(labeled_examples, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+        assert 'prompt' in labeled_examples.columns and 'label' in labeled_examples.columns, \
             'Make sure the prompt column in your pandas DataFrame is named "prompt" and the label column is named "label".'
     if output_metrics:
-        assert prelabeled_text is not None, 'In order to output an estimate of performance with output_metrics, prelabeled_text must be provided.'
+        assert labeled_examples is not None, 'In order to output an estimate of performance with output_metrics, labeled_examples must be provided.'
 
-    if prelabeled_text is None:
-        generate_task_out = GenerateTask(None, None, text_to_label)
+    if labeled_examples is None:
+        generate_task_out = GenerateTask(None, None, to_generate)
         pred_results = generate_task_out.predict()
     else:
-        assert len(prelabeled_text) >= 2, 'At least 2 rows of prelabeled data must be given.'
-        train, val = train_test_split(prelabeled_text, test_size=0.2)
-        generate_task_out = GenerateTask(train, val, text_to_label)
+        assert len(labeled_examples) >= 2, 'At least 2 rows of prelabeled data must be given.'
+        train, val = train_test_split(labeled_examples, test_size=0.2)
+        generate_task_out = GenerateTask(train, val, to_generate)
         generate_task_out.train()
         pred_results = generate_task_out.predict()
     
-    results = text_to_label.copy()
+    results = to_generate.copy()
     results['label_from_tailwiz'] = pred_results
 
     if output_metrics:

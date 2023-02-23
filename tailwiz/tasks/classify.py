@@ -135,53 +135,53 @@ class KMeansClassificationTask(ClassificationTask):
         return self.model.predict(self.test_embeds)
 
 
-def classify(text_to_label, prelabeled_text=None, output_metrics=False):
-    assert isinstance(text_to_label, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-    assert 'text' in text_to_label.columns, 'Make sure the text column in your pandas DataFrame is named "text".'
+def classify(to_classify, labeled_examples=None, output_metrics=False):
+    assert isinstance(to_classify, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+    assert 'text' in to_classify.columns, 'Make sure the text column in your pandas DataFrame is named "text".'
 
-    if prelabeled_text is not None:
-        assert isinstance(prelabeled_text, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
-        assert 'text' in prelabeled_text.columns and 'label' in prelabeled_text.columns, \
+    if labeled_examples is not None:
+        assert isinstance(labeled_examples, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
+        assert 'text' in labeled_examples.columns and 'label' in labeled_examples.columns, \
             'Make sure the text column in your pandas DataFrame is named "text" and the label column is named "label"'
 
     if output_metrics:
-        assert prelabeled_text is not None, 'In order to output an estimate of performance with output_metrics, prelabeled_text must be provided.'
+        assert labeled_examples is not None, 'In order to output an estimate of performance with output_metrics, labeled_examples must be provided.'
 
     # Perform KMeans if no training data is given.
-    if prelabeled_text is None:
-        task = KMeansClassificationTask(text_to_label)
+    if labeled_examples is None:
+        task = KMeansClassificationTask(to_classify)
         task.train()
         pred_results = task.predict()
-        results = text_to_label.copy()
+        results = to_classify.copy()
         results['label_from_tailwiz'] = pred_results
         return results
 
-    if len(prelabeled_text) < 3:
-        raise ValueError('prelabeled_text has too few examples. At least 3 are required.')
+    if len(labeled_examples) < 3:
+        raise ValueError('labeled_examples has too few examples. At least 3 are required.')
 
-    num_unique_classes = len(prelabeled_text.label.unique())
+    num_unique_classes = len(labeled_examples.label.unique())
     if num_unique_classes <= 1:
-        raise ValueError('prelabeled_text contains examples from just one class. Examples from at least 2 classes are required.')
+        raise ValueError('labeled_examples contains examples from just one class. Examples from at least 2 classes are required.')
 
     # Try 10 times to get a proper split. Sometimes, a split will cause all training examples to be
     # in the same class, which will error.
     classify_task_out = None
     split_attempt = 0
     while split_attempt < 10 and classify_task_out is None:
-        train, val = sklearn.model_selection.train_test_split(prelabeled_text, test_size=0.2)
+        train, val = sklearn.model_selection.train_test_split(labeled_examples, test_size=0.2)
         num_unique_classes_in_train = len(train.label.unique())
         if num_unique_classes_in_train < 2:
             split_attempt += 1
             continue
-        classify_task_out = ClassificationTask(train, val, text_to_label)
+        classify_task_out = ClassificationTask(train, val, to_classify)
         classify_task_out.train()
     
     if classify_task_out is None:
-        raise ValueError('''The provided prelabeled_text examples were not diverse enough to estimate performance.
-        Try balancing your prelabeled_text examples by adding more examples of each class.''')
+        raise ValueError('''The provided labeled_examples examples were not diverse enough to estimate performance.
+        Try balancing your labeled_examples examples by adding more examples of each class.''')
     
     pred_results = classify_task_out.predict()
-    results = text_to_label.copy()
+    results = to_classify.copy()
     results['label_from_tailwiz'] = pred_results
 
     if output_metrics:

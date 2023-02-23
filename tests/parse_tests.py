@@ -4,7 +4,7 @@ import pandas as pd
 
 def test_parse_no_training_data():
     results = tailwiz.parse(
-        text_to_label=pd.DataFrame(
+        pd.DataFrame(
             [['When was the Eiffel Tower constructed?', 'The Eiffel Tower was constructed in 2000']], columns=['prompt', 'context']
         )
     )
