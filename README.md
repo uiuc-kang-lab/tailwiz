@@ -1,6 +1,6 @@
-# Text Labeling AI Wizard (tailwiz)
+# tailwiz
 
-`tailwiz` is an AI-powered tool for labeling text. It has three main capabilties: classifying text (`tailwiz.classify`), parsing text given context and prompts (`tailwiz.parse`), and generating text given prompts (`tailwiz.generate`).
+`tailwiz` is an AI-powered tool for analyzing text. It has three main capabilties: classifying text (`tailwiz.classify`), parsing text given context and prompts (`tailwiz.parse`), and generating text given prompts (`tailwiz.generate`).
 
 ## Quickstart
 
