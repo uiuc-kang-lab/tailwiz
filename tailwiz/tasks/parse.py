@@ -2,15 +2,16 @@ import os
 os.environ['TRANSFORMERS_CACHE'] = 'cache'  # Must be before transformers import.
 import pandas as pd
 import torch
+import tqdm
 import transformers
 import evaluate
 from sklearn.model_selection import train_test_split
-import transformers
 
 from .task import Task
 
 class ParsingTask(Task):
     def __init__(self, train, val, test):
+        self.num_steps = 2 if train is None else 3
         self.tokenizer = transformers.BertTokenizer.from_pretrained('bert-large-uncased-whole-word-masking-finetuned-squad')
         (
             self.train_dataset,
@@ -20,57 +21,87 @@ class ParsingTask(Task):
         self.model = self._load_model()
 
     def _load_data(self, train, val, test):
+        print(f'\n(1/{self.num_steps}) PROCESSING DATA...\n')
+
+        text = test.prompt.tolist() + test.context.tolist()
+        if train is not None:
+            text += train.prompt.tolist() + train.context.tolist() + train.label.tolist()
+        if val is not None:
+            text += val.prompt.tolist() + val.context.tolist() + val.label.tolist()
+        if len(max(text, key=len).split()) > 400:
+            print('''
+***
+
+WARNING
+At least one of your texts is long so it may have been truncated.
+In general, this is okay. If you wish to use all your data, we
+suggest you split your long texts into multiple lines. Try to remain
+under 400 words per text.
+
+***
+''')
         # Tokenize.
-        train_tokens = None if train is None else self.tokenizer(train.prompt.tolist(), train.context.tolist(), train.label.tolist(), padding=True, return_tensors='pt')
-        
-        val_tokens = None if val is None else self.tokenizer(val.prompt.tolist(), val.context.tolist(), val.label.tolist(), padding=True, return_tensors='pt')
+        with tqdm.tqdm(total=5) as pbar:
+            train_tokens = None if train is None else self.tokenizer(train.prompt.tolist(), train.context.tolist(), train.label.tolist(), padding=True, truncation=True, return_tensors='pt')
+            pbar.update()
+            
+            val_tokens = None if val is None else self.tokenizer(val.prompt.tolist(), val.context.tolist(), val.label.tolist(), padding=True, truncation=True, return_tensors='pt')
+            pbar.update()
 
-        test_tokens = self.tokenizer(test.prompt.tolist(), test.context.tolist(), padding=True, return_tensors='pt')
+            test_tokens = self.tokenizer(test.prompt.tolist(), test.context.tolist(), padding=True, truncation=True, return_tensors='pt')
+            pbar.update()
 
-        # Helper function that finds the start and end positions of the label within the context.
-        # By default sets the start and end positions to the first occurrence of the label.
-        def get_target_start_end_pos(tokens, contexts, labels):
-            target_start_pos = []
-            target_end_pos = []
-            for i, (text_tokenized, label_tokenized, context, label) in enumerate(zip(tokens['input_ids'], tokens['labels'], contexts, labels)):
-                if label_tokenized[0] == 101 and label_tokenized[1] == 102:
-                    target_start_pos.append(0)
-                    target_end_pos.append(0)
-                else:
-                    label_tokenized_nopad = label_tokenized[label_tokenized.nonzero()].squeeze()
-                    label_tokenized_nospectoks = label_tokenized_nopad[1:-1]
+            # Helper function that finds the start and end positions of the label within the context.
+            # By default sets the start and end positions to the first occurrence of the label.
+            def get_target_start_end_pos(tokens, contexts, labels):
+                target_start_pos = []
+                target_end_pos = []
+                for i, (text_tokenized, label_tokenized, context, label) in enumerate(zip(tokens['input_ids'], tokens['labels'], contexts, labels)):
+                    if label_tokenized[0] == 101 and label_tokenized[1] == 102:
+                        target_start_pos.append(0)
+                        target_end_pos.append(0)
+                    else:
+                        label_tokenized_nopad = label_tokenized[label_tokenized.nonzero()].squeeze()
+                        label_tokenized_nospectoks = label_tokenized_nopad[1:-1]
 
-                    for j in range(len(text_tokenized) - len(label_tokenized_nospectoks)):  # Search from start for label
-                        if (text_tokenized[j:j+len(label_tokenized_nospectoks)] == label_tokenized_nospectoks).all():
-                            target_start_pos.append(j)
-                            target_end_pos.append(j+len(label_tokenized_nospectoks))
-                            break
-                if len(target_start_pos) != i + 1:
-                    raise ValueError(f'''We could not find the label:
-                        
+                        for j in range(len(text_tokenized) - len(label_tokenized_nospectoks)):  # Search from start for label
+                            if (text_tokenized[j:j+len(label_tokenized_nospectoks)] == label_tokenized_nospectoks).all():
+                                target_start_pos.append(j)
+                                target_end_pos.append(j+len(label_tokenized_nospectoks))
+                                break
+                    if len(target_start_pos) != i + 1:
+                        raise ValueError(f'''We could not find the label:
+                            
                         {label}
 
 in the context:
                         
                         {context}
 
-Either: (A) only include labels where the label is extracted exactly from the context as whole words, or (B) use the generate()
-function, which does not require the labels do be found in the context.''')
-            target_start_pos = torch.tensor(target_start_pos)
-            target_end_pos = torch.tensor(target_end_pos)
-            return target_start_pos, target_end_pos
+because either the context was truncated due to its length and the
+label appears later in the context, or because the label is not found
+at all in the context.
 
-        if train_tokens is not None:
-            train_target_start_pos, train_target_end_pos = get_target_start_end_pos(train_tokens, train.context.tolist(), train.label.tolist())
-            train_tokens['start_positions'] = train_target_start_pos
-            train_tokens['end_positions'] =  train_target_end_pos
-            train_tokens = {k:v for k, v in train_tokens.items() if k != 'labels'}
+To resolve, either: (A) only include labels where the label is extracted
+exactly from the context as whole words, or (B) use the generate() function,
+which does not require the labels do be found in the context.''')
+                target_start_pos = torch.tensor(target_start_pos)
+                target_end_pos = torch.tensor(target_end_pos)
+                return target_start_pos, target_end_pos
 
-        if val_tokens is not None:
-            val_target_start_pos, val_target_end_pos = get_target_start_end_pos(val_tokens, val.context.tolist(), val.label.tolist())
-            val_tokens['start_positions'] = val_target_start_pos
-            val_tokens['end_positions'] =  val_target_end_pos
-            val_tokens = {k:v for k, v in val_tokens.items() if k != 'labels'}
+            if train_tokens is not None:
+                train_target_start_pos, train_target_end_pos = get_target_start_end_pos(train_tokens, train.context.tolist(), train.label.tolist())
+                train_tokens['start_positions'] = train_target_start_pos
+                train_tokens['end_positions'] =  train_target_end_pos
+                train_tokens = {k:v for k, v in train_tokens.items() if k != 'labels'}
+            pbar.update()
+
+            if val_tokens is not None:
+                val_target_start_pos, val_target_end_pos = get_target_start_end_pos(val_tokens, val.context.tolist(), val.label.tolist())
+                val_tokens['start_positions'] = val_target_start_pos
+                val_tokens['end_positions'] =  val_target_end_pos
+                val_tokens = {k:v for k, v in val_tokens.items() if k != 'labels'}
+            pbar.update()
 
         return train_tokens, val_tokens, test_tokens
 
@@ -85,6 +116,7 @@ function, which does not require the labels do be found in the context.''')
         return strs
 
     def train(self):
+        print(f'\n(2/{self.num_steps}) LEARNING...\n')
         class BLUWWMFSDataset(torch.utils.data.Dataset):
             def __init__(self, data):
                 self.data = data
@@ -113,6 +145,7 @@ function, which does not require the labels do be found in the context.''')
         trainer.train()
 
     def evaluate(self):
+        print('\nGETTING METRICS...\n')
         # Remove 'labels' key from validation dataset for prediction.
         outputs = self.model.to(self.val_dataset['input_ids'].device)(**self.val_dataset)
 
@@ -131,8 +164,17 @@ function, which does not require the labels do be found in the context.''')
         return metrics
 
     def predict(self):
-        outputs = self.model.to(self.test_dataset['input_ids'].device)(**self.test_dataset)
-        return self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.test_dataset['input_ids'])
+        print(f'\n({self.num_steps}/{self.num_steps}) CREATING TAILWIZ LABELS...\n')
+        self.model = self.model.to(self.test_dataset['input_ids'].device)
+        out_predictions = []
+        for i in tqdm.tqdm(range(self.test_dataset['input_ids'].shape[0])):
+            outputs = self.model(
+                input_ids=self.test_dataset['input_ids'][i].unsqueeze(0),
+                token_type_ids=self.test_dataset['token_type_ids'][i].unsqueeze(0),
+                attention_mask=self.test_dataset['attention_mask'][i].unsqueeze(0))
+            out_predictions.extend(self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.test_dataset['input_ids'][i].unsqueeze(0)))
+        return out_predictions
+        # return self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.test_dataset['input_ids'])
 
 
 def parse(to_parse, labeled_examples=None, output_metrics=False):
@@ -158,9 +200,10 @@ def parse(to_parse, labeled_examples=None, output_metrics=False):
         pred_results = parse_task_out.predict()
     
     results = to_parse.copy()
-    results['label_from_tailwiz'] = pred_results
+    results['tailwiz_label'] = pred_results
 
     if output_metrics:
         metrics = parse_task_out.evaluate()
 
+    print('\nDONE')
     return (results, metrics) if output_metrics else results

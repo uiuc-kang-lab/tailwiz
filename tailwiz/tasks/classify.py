@@ -6,6 +6,7 @@ import sklearn
 from sklearn import cluster, linear_model, metrics, multiclass
 from sklearn.model_selection import train_test_split
 import torch
+import tqdm
 import transformers
 
 from . import utils
@@ -14,6 +15,7 @@ from .task import Task
 
 class ClassificationTask(Task):
     def __init__(self, train, val, test):
+        print(f'\n(1/3) PROCESSING DATA...\n')
         train = train if train is not None else pd.DataFrame([], columns=['text', 'label'])
         val = val if val is not None else pd.DataFrame([], columns=['text', 'label'])
         (
@@ -38,16 +40,37 @@ class ClassificationTask(Task):
     def _load_data(self, train, val, test):
         text = train.text.tolist() + val.text.tolist() + test.text.tolist()  # Must embed togeter to match sequence length.
 
+        if len(max(text, key=len).split()) > 400:
+            print('''
+***
+
+WARNING
+At least one of your texts is long so it may have been truncated.
+In general, this is okay. If you wish to use all your data, we
+suggest you split your long texts into multiple lines. Try to remain
+under 400 words per text.
+
+***
+''')
+        print('  - Data Processing Step 1 of 2...')
         # Tokenize.
         tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
-        token_ids = tokenizer(text, return_tensors='pt', padding=True)
-        
+
+        tokens = []
+        for t in tqdm.tqdm(text):
+            token_ids = tokenizer(t, return_tensors='pt', padding=True, truncation=True)
+            tokens.append(token_ids)
+
         # Embed.
+        print('  - Data Processing Step 2 of 2...')
+        embeds = []
         embed_model = transformers.BertModel.from_pretrained('bert-base-uncased')
         embed_model.eval()
         with torch.no_grad():
-            embeds = embed_model(**token_ids)[0]
-        embeds = embeds.mean(axis=1)
+            for token in tqdm.tqdm(tokens):
+                embed = embed_model(**token)[0]
+                embeds.append(embed.mean(1).squeeze())
+        embeds = torch.stack(embeds, 0)
 
         return embeds[:len(train)], train.label.tolist(), embeds[len(train):len(train) + len(val)], val.label.tolist(), embeds[len(train) + len(val):]
 
@@ -55,6 +78,7 @@ class ClassificationTask(Task):
         return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=1000))
     
     def train(self):
+        print(f'\n(2/3) LEARNING...\n')
         self.model.fit(self.train_embeds, self.train_labels)
 
     def evaluate(self):
@@ -72,7 +96,8 @@ class ClassificationTask(Task):
         auprs = {}
 
         # Get one-vs-all classification metrics for each class.
-        for i, class_name in enumerate(self.classes):
+        print('\nGETTING METRICS...\n')
+        for i, class_name in tqdm.tqdm(enumerate(self.classes)):
             class_bin = [0 for _ in range(len(self.classes))]
             class_bin[i] = 1
 
@@ -100,16 +125,18 @@ class ClassificationTask(Task):
         }
     
     def predict(self):
-        predictions = self.model.predict(self.test_embeds)
+        print(f'\n(3/3) CREATING TAILWIZ LABELS...\n')
         out_predictions = []
-        for i in range(len(predictions)):
-            class_i = np.argmax(predictions[i])
+        for i in tqdm.tqdm(range(self.test_embeds.shape[0])):
+            prediction = self.model.predict(self.test_embeds[i].unsqueeze(0))
+            class_i = np.argmax(prediction[0])
             out_predictions.append(self.classes[class_i])
         return out_predictions
 
 
 class KMeansClassificationTask(ClassificationTask):
     def __init__(self, test):
+        print(f'\n(1/2) PROCESSING DATA...\n')
         (_, _, _, _, self.test_embeds) = self._load_data(
             pd.DataFrame([], columns=['text', 'label']),
             pd.DataFrame([], columns=['text', 'label']),
@@ -132,7 +159,12 @@ class KMeansClassificationTask(ClassificationTask):
         pass
     
     def predict(self):
-        return self.model.predict(self.test_embeds)
+        print(f'\n(2/2) CREATING TAILWIZ LABELS...\n')
+        out_predictions = []
+        for i in tqdm.tqdm(range(self.test_embeds.shape[0])):
+            prediction = self.model.predict(self.test_embeds[i].unsqueeze(0))
+            out_predictions.append(prediction[0])
+        return out_predictions  # self.model.predict(self.test_embeds)
 
 
 def classify(to_classify, labeled_examples=None, output_metrics=False):
@@ -153,7 +185,7 @@ def classify(to_classify, labeled_examples=None, output_metrics=False):
         task.train()
         pred_results = task.predict()
         results = to_classify.copy()
-        results['label_from_tailwiz'] = pred_results
+        results['tailwiz_label'] = pred_results
         return results
 
     if len(labeled_examples) < 3:
@@ -182,9 +214,10 @@ def classify(to_classify, labeled_examples=None, output_metrics=False):
     
     pred_results = classify_task_out.predict()
     results = to_classify.copy()
-    results['label_from_tailwiz'] = pred_results
+    results['tailwiz_label'] = pred_results
 
     if output_metrics:
         metrics_out = classify_task_out.evaluate()
 
+    print('\nDONE')
     return (results, metrics_out) if output_metrics else results

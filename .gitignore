@@ -2,7 +2,7 @@ cache/
 examples/data/*-from-tailwiz.csv
 clean.sh
 upload.sh
-tests/test_scratch.py
+tests/scratch_test.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

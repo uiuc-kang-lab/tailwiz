@@ -7,7 +7,7 @@
 Install `tailwiz` by entering into command line:
 
 ```
-python -m pip install tailwiz
+python -m pip install --upgrade tailwiz
 ```
 Then run the following in a Python environment for a quick example of text classification:
 
@@ -15,7 +15,7 @@ Then run the following in a Python environment for a quick example of text class
 import tailwiz
 import pandas as pd
 
-# Create a pandas DataFrame of labeled text. Notice the 'label'
+# Create a pandas DataFrame of labeled text. The 'label'
 # column contains 'mean' or 'nice' as labels for each text.
 labeled_examples = pd.DataFrame(
     [
@@ -27,30 +27,30 @@ labeled_examples = pd.DataFrame(
 )
 
 # Create a pandas DataFrame of text to be classified by tailwiz.
-# Notice that this DataFrame does not have a 'label' column.
-# The labels here will be created by tailwiz.
-text = pd.DataFrame(
+# This DataFrame does not have a 'label' column. The labels here
+# will be created by tailwiz.
+to_classify = pd.DataFrame(
     ['Have a great day', 'I hate you'],
     columns=['text'],
 )
 
 # Classify text using labeled_examples as reference data.
 results = tailwiz.classify(
-    text,
+    to_classify,
     labeled_examples=labeled_examples,
 )
 
-# Note how the results are a copy of text with a new column
-# populated with AI-generated labels.
+# The results are a copy of text with a new column populated
+# with AI-generated labels.
 print(results)
 ```
 
 ## Installation
 
-Install `tailwiz` through `pip`:
+Install `tailwiz` through `pip` by entering the following into command line:
 
 ```
-python -m pip install tailwiz
+python -m pip install --upgrade tailwiz
 ```
 
 ## Usage
@@ -67,8 +67,8 @@ Given text, classify the text.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
 
 #### Returns:
-- `results` : _pandas.DataFrame_. A copy of `to_classify` with a new column, `'label_from_tailwiz'`, containing classification results.
-- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses labeled_examples to give an estimate of the accuracy of the classification. One vs. all metrics are given for multiclass classification.
+- `results` : _pandas.DataFrame_. A copy of `to_classify` with a new column, `'tailwiz_label'`, containing classification results.
+- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses `labeled_examples` to give an estimate of the accuracy of the classification.
 
 #### Example:
 
@@ -84,12 +84,12 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['text', 'label'],
 )
-text = pd.DataFrame(
+to_classify = pd.DataFrame(
     ['Have a great day', 'I hate you'],
     columns=['text'],
 )
 results = tailwiz.classify(
-    text,
+    to_classify,
     labeled_examples=labeled_examples,
 )
 print(results)
@@ -104,8 +104,8 @@ Given a prompt and a context, parse the answer from the context.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
 
 #### Returns:
-- `results` : _pandas.DataFrame_. A copy of `to_parse` with a new column, `'label_from_tailwiz'`, containing parsed results.
-- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses labeled_examples to give an estimate of the accuracy of the parsing job.
+- `results` : _pandas.DataFrame_. A copy of `to_parse` with a new column, `'tailwiz_label'`, containing parsed results.
+- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses `labeled_examples` to give an estimate of the accuracy of the parsing job.
 
 #### Example:
 ```python
@@ -120,12 +120,12 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['prompt', 'context', 'label'],
 )
-text = pd.DataFrame(
+to_parse = pd.DataFrame(
     [['Extract the money.', 'Try to save at least £10']],
     columns=['prompt', 'context'],
 )
 results = tailwiz.parse(
-    text,
+    to_parse,
     labeled_examples=labeled_examples,
 )
 print(results)
@@ -141,8 +141,8 @@ Given a prompt, generate an answer.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
 
 #### Returns:
-- `results` : _pandas.DataFrame_. A copy of `to_generate` with a new column, `'label_from_tailwiz'`, containing generated results.
-- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses labeled_examples to give an estimate of the accuracy of the text generation job.
+- `results` : _pandas.DataFrame_. A copy of `to_generate` with a new column, `'tailwiz_label'`, containing generated results.
+- `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses `labeled_examples` to give an estimate of the accuracy of the text generation job.
 
 #### Example:
 ```python
@@ -157,12 +157,12 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['prompt', 'label']
 )
-text = pd.DataFrame(
+to_generate = pd.DataFrame(
     ['Label this sentence as "positive" or "negative": I am crying my eyes out.'],
     columns=['prompt']
 )
 results = tailwiz.generate(
-    text,
+    to_generate,
     labeled_examples=labeled_examples,
 )
 print(results)

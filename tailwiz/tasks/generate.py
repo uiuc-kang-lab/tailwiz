@@ -3,6 +3,7 @@ import os
 os.environ['TRANSFORMERS_CACHE'] = 'cache'  # Must be before transformers import.
 import pandas as pd
 import torch
+import tqdm
 import transformers
 from sklearn.model_selection import train_test_split
 
@@ -10,6 +11,8 @@ from .task import Task
 
 class GenerateTask(Task):
     def __init__(self, train, val, test):
+        self.num_steps = 2 if train is None else 3
+        print(f'\n(1/{self.num_steps}) PROCESSING DATA...\n')
         (
             self.train_dataset,
             self.val_dataset,
@@ -21,19 +24,30 @@ class GenerateTask(Task):
     def _load_data(self, train, val, test):
         self.tokenizer = transformers.T5Tokenizer.from_pretrained('google/flan-t5-base', cache_dir='cache/flan-t5')
         
+        print('  - Data Processing Step 1 of 3...')
         train_tokens = None
         if train is not None:
-            train_tokens = self.tokenizer(train.prompt.tolist(), return_tensors='pt', padding=True)
-            train_labels = self.tokenizer(train.label.tolist(), return_tensors='pt', padding=True)
-            train_tokens['labels'] = train_labels['input_ids']
+            with tqdm.tqdm(total=2) as pbar:
+                train_tokens = self.tokenizer(train.prompt.tolist(), return_tensors='pt', padding=True)
+                pbar.update()
+                train_labels = self.tokenizer(train.label.tolist(), return_tensors='pt', padding=True)
+                train_tokens['labels'] = train_labels['input_ids']
+                pbar.update()
         
+        print('  - Data Processing Step 2 of 3...')
         val_tokens = None
         if val is not None:
-            val_tokens = self.tokenizer(val.prompt.tolist(), return_tensors='pt', padding=True)
-            val_labels = self.tokenizer(val.label.tolist(), return_tensors='pt', padding=True)
-            val_tokens['labels'] = val_labels['input_ids']
+            with tqdm.tqdm(total=2) as pbar:
+                val_tokens = self.tokenizer(val.prompt.tolist(), return_tensors='pt', padding=True)
+                pbar.update()
+                val_labels = self.tokenizer(val.label.tolist(), return_tensors='pt', padding=True)
+                val_tokens['labels'] = val_labels['input_ids']
+                pbar.update()
 
-        test_tokens = self.tokenizer(test.prompt.tolist(), return_tensors='pt', padding=True)
+        print('  - Data Processing Step 3 of 3...')
+        with tqdm.tqdm(total=1) as pbar:
+            test_tokens = self.tokenizer(test.prompt.tolist(), return_tensors='pt', padding=True)
+            pbar.update()
 
         return train_tokens, val_tokens, (val.label.tolist() if val is not None else None), test_tokens
 
@@ -41,6 +55,7 @@ class GenerateTask(Task):
         return transformers.T5ForConditionalGeneration.from_pretrained('google/flan-t5-base', cache_dir='cache/flan-t5')
 
     def train(self):
+        print(f'\n(2/{self.num_steps}) LEARNING...\n')
         class FT5Dataset(torch.utils.data.Dataset):
             def __init__(self, data):
                 self.data = data
@@ -70,6 +85,7 @@ class GenerateTask(Task):
         trainer.train()
 
     def evaluate(self):
+        print('\nGETTING METRICS...\n')
         # Remove 'labels' key from validation dataset for prediction.
         dummy_val = self.val_dataset.copy()
         del dummy_val['labels']
@@ -88,7 +104,10 @@ class GenerateTask(Task):
         return metrics
 
     def predict(self):
-        outputs = self.model.to(self.test_dataset['input_ids'].device).generate(**self.test_dataset)
+        print(f'\n({self.num_steps}/{self.num_steps}) CREATING TAILWIZ LABELS...\n')
+        with tqdm.tqdm(total=1) as pbar:
+            outputs = self.model.to(self.test_dataset['input_ids'].device).generate(**self.test_dataset)
+            pbar.update()
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
@@ -114,9 +133,10 @@ def generate(to_generate, labeled_examples=None, output_metrics=False):
         pred_results = generate_task_out.predict()
     
     results = to_generate.copy()
-    results['label_from_tailwiz'] = pred_results
+    results['tailwiz_label'] = pred_results
 
     if output_metrics:
         metrics = generate_task_out.evaluate()
 
+    print('\nDONE')
     return (results, metrics) if output_metrics else results
