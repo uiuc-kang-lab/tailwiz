@@ -40,7 +40,23 @@ class ClassificationTask(Task):
     def _load_data(self, train, val, test):
         text = train.text.tolist() + val.text.tolist() + test.text.tolist()  # Must embed togeter to match sequence length.
 
-        if len(max(text, key=len).split()) > 400:
+        print('  - Data Processing Step 1 of 2...')
+        # Tokenize.
+        tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
+
+        tokens = []
+        is_truncated = False
+        for t in tqdm.tqdm(text):
+            token_ids = tokenizer(t, return_tensors='pt', padding=True)
+            if token_ids['input_ids'].shape[1] > 512:
+                is_truncated = True
+                token_ids['input_ids'] = token_ids['input_ids'][:, :512]
+                token_ids['input_ids'][:, 511] = 102
+                token_ids['token_type_ids'] = token_ids['token_type_ids'][:, :512]
+                token_ids['attention_mask'] = token_ids['attention_mask'][:, :512]
+
+            tokens.append(token_ids)
+        if is_truncated:
             print('''
 ***
 
@@ -48,18 +64,10 @@ WARNING
 At least one of your texts is long so it may have been truncated.
 In general, this is okay. If you wish to use all your data, we
 suggest you split your long texts into multiple lines. Try to remain
-under 400 words per text.
+under 300 words per text.
 
 ***
 ''')
-        print('  - Data Processing Step 1 of 2...')
-        # Tokenize.
-        tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
-
-        tokens = []
-        for t in tqdm.tqdm(text):
-            token_ids = tokenizer(t, return_tensors='pt', padding=True, truncation=True)
-            tokens.append(token_ids)
 
         # Embed.
         print('  - Data Processing Step 2 of 2...')
@@ -75,7 +83,7 @@ under 400 words per text.
         return embeds[:len(train)], train.label.tolist(), embeds[len(train):len(train) + len(val)], val.label.tolist(), embeds[len(train) + len(val):]
 
     def _load_model(self):
-        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=1000))
+        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=1000, verbose=1))
     
     def train(self):
         print(f'\n(2/3) LEARNING...\n')
