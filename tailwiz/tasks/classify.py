@@ -70,14 +70,20 @@ under 300 words per text.
 ''')
 
         # Embed.
+        if torch.cuda.is_available():
+            device = 'cuda'
+        else:
+            device = 'cpu'
         print('  - Data Processing Step 2 of 2...')
         embeds = []
-        embed_model = transformers.BertModel.from_pretrained('bert-base-uncased')
+        embed_model = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
         embed_model.eval()
         with torch.no_grad():
             for token in tqdm.tqdm(tokens):
-                embed = embed_model(**token)[0]
-                embeds.append(embed.mean(1).squeeze())
+                embed = embed_model(input_ids=token['input_ids'].to(device),
+                                    token_type_ids=token['token_type_ids'].to(device),
+                                    attention_mask=token['attention_mask'].to(device))[0]
+                embeds.append(embed.mean(1).squeeze().cpu())
         embeds = torch.stack(embeds, 0)
 
         return embeds[:len(train)], train.label.tolist(), embeds[len(train):len(train) + len(val)], val.label.tolist(), embeds[len(train) + len(val):]
