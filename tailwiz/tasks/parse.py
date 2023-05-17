@@ -11,6 +11,9 @@ from .task import Task
 
 class ParsingTask(Task):
     def __init__(self, train, val, test):
+        import os
+        os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+        print('bye')
         self.num_steps = 2 if train is None else 3
         self.tokenizer = transformers.BertTokenizer.from_pretrained('bert-large-uncased-whole-word-masking-finetuned-squad')
         (
@@ -129,10 +132,10 @@ which does not require the labels do be found in the context.''')
 
         args = transformers.TrainingArguments(
             'cache/bert-qa',
-            num_train_epochs=10,
+            num_train_epochs=7,
             evaluation_strategy='epoch',
-            save_strategy='epoch',
-            load_best_model_at_end=True,
+            save_strategy='no',
+            #load_best_model_at_end=True,
             metric_for_best_model='eval_loss',
             logging_steps=1,
         )
@@ -151,6 +154,9 @@ which does not require the labels do be found in the context.''')
 
         predictions = self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.val_dataset['input_ids'])
         references = self._decode_pos2strs(self.val_dataset['start_positions'], self.val_dataset['end_positions'], self.val_dataset['input_ids'])
+
+        predictions = ['unlisted' if x == '' else x for x in predictions]
+        references = ['unlisted' if x == '' else x for x in references]
 
         metrics_funcs = [
             evaluate.load('exact_match'),
