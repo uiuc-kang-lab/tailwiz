@@ -11,9 +11,6 @@ from .task import Task
 
 class ParsingTask(Task):
     def __init__(self, train, val, test):
-        import os
-        os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-        print('bye')
         self.num_steps = 2 if train is None else 3
         self.tokenizer = transformers.BertTokenizer.from_pretrained('bert-large-uncased-whole-word-masking-finetuned-squad')
         (
@@ -138,6 +135,8 @@ which does not require the labels do be found in the context.''')
             #load_best_model_at_end=True,
             metric_for_best_model='eval_loss',
             logging_steps=1,
+            no_cuda=(not torch.cuda.is_available()),
+            use_mps_device=(torch.backends.mps.is_available() and not torch.cuda.is_available()),
         )
         trainer = transformers.Trainer(
             model=self.model,

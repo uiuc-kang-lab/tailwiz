@@ -40,6 +40,8 @@ class ClassificationTask(Task):
 
         if torch.cuda.is_available():
             device = 'cuda'
+        elif torch.backends.mps.is_available():
+            device = 'mps'
         else:
             device = 'cpu'
 
@@ -119,7 +121,7 @@ under 300 words per text.
         return train_embeds, train_embeds_probe, train_labels, val_embeds, val_embeds_probe, val_labels, test_embeds, test_embeds_probe
 
     def _load_model(self):
-        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=1000, class_weight='balanced'))
+        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=10000, class_weight='balanced'))
     
     def train(self):
         print(f'\n(2/3) LEARNING...\n')

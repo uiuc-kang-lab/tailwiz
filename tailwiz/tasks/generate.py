@@ -66,7 +66,6 @@ class GenerateTask(Task):
             def __getitem__(self, index):
                 return {k: self.data[k][index] for k in self.data.keys()}
 
-        os.environ['CUDA_VISIBLE_DEVICES'] = '0'
         args = transformers.Seq2SeqTrainingArguments(
             'cache/flan-t5',
             num_train_epochs=7,
@@ -77,6 +76,8 @@ class GenerateTask(Task):
             predict_with_generate=True,
             metric_for_best_model='eval_loss',
             logging_steps=1,
+            no_cuda=(not torch.cuda.is_available()),
+            use_mps_device=(torch.backends.mps.is_available() and not torch.cuda.is_available()),
         )
         trainer = transformers.Seq2SeqTrainer(
             model=self.model,
