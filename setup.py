@@ -17,6 +17,7 @@ setup(
         'torch',
         'numpy',
         'sentencepiece',
+        'accelerate',
     ],
     packages=find_packages(),
     author='Timothy Dai',

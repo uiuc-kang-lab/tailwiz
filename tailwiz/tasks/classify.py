@@ -17,13 +17,13 @@ class ClassificationTask(Task):
     def __init__(self, train, val, test):
         print(f'\n(1/3) PROCESSING DATA...\n')
         (
-            self.train_embeds,
+            # self.train_embeds,
             self.train_embeds_probe,
             self.train_labels,
-            self.val_embeds,
+            # self.val_embeds,
             self.val_embeds_probe,
             self.val_labels,
-            self.test_embeds,
+            # self.test_embeds,
             self.test_embeds_probe,
         ) = self._load_data(train, val, test)
 
@@ -70,18 +70,19 @@ class ClassificationTask(Task):
 
             # Embed.
             with torch.no_grad():
-                outputs = [embed_model(input_tensor.to(device)) for input_tensor in input_tensors]  
+                outputs = [embed_model(input_tensor.to(device)) for input_tensor in input_tensors[:1]]  
                 
-                hidden_states = outputs[0].last_hidden_state.mean(1).squeeze().cpu()
+                # hidden_states = outputs[0].last_hidden_state.mean(1).squeeze().cpu()
+                # hidden_states = torch.stack([output.last_hidden_state.mean(1) for output in outputs], 0).mean(0).cpu()
                 hidden_states_probe = torch.stack([torch.concat(output.hidden_states, 0).mean(1) for output in outputs], 0).mean(0).cpu() # Mean over seq len (1) and over wrapped sequences (0).
 
-                embeds.append(hidden_states)
+                # embeds.append(hidden_states)
                 embeds_probe.append(hidden_states_probe)
 
-        embeds = torch.stack(embeds, 0)
+        # embeds = torch.stack(embeds, 0)
         embeds_probe = torch.stack(embeds_probe, 0)
         
-        embeds = embeds.view(embeds.shape[0], -1)
+        # embeds = embeds.view(embeds.shape[0], -1)
         embeds_probe = embeds_probe.view(embeds_probe.shape[0], -1)
 
         if is_overlapped:
@@ -96,13 +97,13 @@ under 300 words per text.
 
 ***
 ''')
-        train_embeds = embeds[:len(train)] if train is not None else []
+        # train_embeds = embeds[:len(train)] if train is not None else []
         train_embeds_probe = embeds_probe[:len(train)] if train is not None else []
         train_labels = train.label.tolist() if train is not None else []
-        val_embeds = embeds[len(train_embeds):len(train_embeds) + len(val)] if val is not None else []
+        # val_embeds = embeds[len(train_embeds):len(train_embeds) + len(val)] if val is not None else []
         val_embeds_probe = embeds_probe[len(train_embeds_probe):len(train_embeds_probe) + len(val)] if val is not None else []
         val_labels = val.label.tolist() if val is not None else []
-        test_embeds = embeds[len(train_embeds) + len(val_embeds):]
+        # test_embeds = embeds[len(train_embeds) + len(val_embeds):]
         test_embeds_probe = embeds_probe[len(train_embeds_probe) + len(val_embeds_probe):]
 
         self.classes = list(set(train_labels + val_labels))
@@ -118,52 +119,61 @@ under 300 words per text.
         if len(val_labels) > 0:
             val_labels = binarize_labels(val_labels, self.classes)
 
-        return train_embeds, train_embeds_probe, train_labels, val_embeds, val_embeds_probe, val_labels, test_embeds, test_embeds_probe
+        return (
+            # train_embeds, 
+            train_embeds_probe, 
+            train_labels, 
+            # val_embeds, 
+            val_embeds_probe, 
+            val_labels, 
+            # test_embeds, 
+            test_embeds_probe
+        )
 
     def _load_model(self):
         return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=10000, class_weight='balanced'))
     
     def train(self):
         print(f'\n(2/3) LEARNING...\n')
-        self.model.fit(self.train_embeds, self.train_labels)
+        # self.model.fit(self.train_embeds, self.train_labels)
         self.model_probe.fit(self.train_embeds_probe, self.train_labels)
 
     def evaluate(self):
-        if len(self.val_embeds) == 0:
+        if len(self.val_embeds_probe) == 0:
             return None
 
-        val_preds = self.model.predict(self.val_embeds)
-        val_probs = self.model.predict_proba(self.val_embeds)
+        # val_preds = self.model.predict(self.val_embeds)
+        # val_probs = self.model.predict_proba(self.val_embeds)
         
         val_preds_probe = self.model_probe.predict(self.val_embeds_probe)
         val_probs_probe = self.model_probe.predict_proba(self.val_embeds_probe)
 
-        accs = {}
-        precs = {}
-        recs = {}
-        f1s = {}
-        aurocs = {}
-        auprs = {}
-
         # Get one-vs-all classification metrics for each class.
         print('\nGETTING METRICS...\n')
-        def get_metrics(val_preds, val_probs):
+        print("HIIIIIIIBAOEIFOWIEJFOEWIJFOEIJF")
+        def get_metrics(preds, probs):
+            accs = {}
+            precs = {}
+            recs = {}
+            f1s = {}
+            aurocs = {}
+            auprs = {}
             for i, class_name in tqdm.tqdm(enumerate(self.classes)):
                 class_bin = [0 for _ in range(len(self.classes))]
                 class_bin[i] = 1
 
                 labels_bin = [1 if j == class_bin else 0 for j in self.val_labels]
-                preds_bin = [1 if j == class_bin else 0 for j in val_preds.tolist()]
+                preds_bin = [1 if j == class_bin else 0 for j in preds.tolist()]
 
                 accs[class_name] = metrics.accuracy_score(labels_bin, preds_bin).item()
                 precs[class_name] = metrics.precision_score(labels_bin, preds_bin, zero_division=0).item()
                 recs[class_name] = metrics.recall_score(labels_bin, preds_bin, zero_division=0).item()
                 f1s[class_name] = metrics.f1_score(labels_bin, preds_bin, zero_division=0).item()
 
-                fpr, tpr, _ = metrics.roc_curve(labels_bin, val_probs[:,i])
+                fpr, tpr, _ = metrics.roc_curve(labels_bin, probs[:,i])
                 aurocs[class_name] = metrics.auc(fpr, tpr).item()
 
-                precision, recall, _ = metrics.precision_recall_curve(labels_bin, val_probs[:,i])
+                precision, recall, _ = metrics.precision_recall_curve(labels_bin, probs[:,i])
                 auprs[class_name] = metrics.auc(recall, precision).item()
 
             return {
@@ -175,18 +185,33 @@ under 300 words per text.
                 'aupr': auprs,
             }
         
-        metrics_noprobe = get_metrics(val_preds, val_probs)
+        # metrics_noprobe = get_metrics(val_preds, val_probs)
         metrics_probe = get_metrics(val_preds_probe, val_probs_probe)
 
-        if sum(metrics_noprobe['f1'].values()) > sum(metrics_probe['f1'].values()):
-            self.better_model = self.model
-            self.better_model_test_embeds = self.test_embeds
-            return metrics_noprobe
-        else:
-            self.better_model = self.model_probe
-            self.better_model_test_embeds = self.test_embeds_probe
-            return metrics_probe
+        # print('NO PROBE', metrics_noprobe)
+        # print('PROBE', metrics_probe)
 
+        # if 1 in metrics_noprobe['f1']:
+        #     if metrics_noprobe['f1'][1] > metrics_probe['f1'][1]:
+        #         self.better_model = self.model
+        #         self.better_model_test_embeds = self.test_embeds
+        #         return metrics_noprobe
+        #     else:
+        #         self.better_model = self.model_probe
+        #         self.better_model_test_embeds = self.test_embeds_probe
+        #         return metrics_probe
+        # else:
+        #     if sum(metrics_noprobe['f1'].values()) > sum(metrics_probe['f1'].values()):
+        #         self.better_model = self.model
+        #         self.better_model_test_embeds = self.test_embeds
+        #         return metrics_noprobe
+        #     else:
+        #         self.better_model = self.model_probe
+        #         self.better_model_test_embeds = self.test_embeds_probe
+        #         return metrics_probe
+        self.better_model = self.model_probe
+        self.better_model_test_embeds = self.test_embeds_probe
+        return metrics_probe
     
     def predict(self):
         print(f'\n(3/3) CREATING TAILWIZ LABELS...\n')
