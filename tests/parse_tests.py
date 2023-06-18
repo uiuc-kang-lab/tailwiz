@@ -61,3 +61,16 @@ def test_parse_with_metrics():
     assert metrics is not None
     assert 'rouge1' in metrics
     assert type(metrics['rouge1']) == float
+
+
+def test_parse_override_train_args():
+    results = tailwiz.parse(
+        pd.DataFrame([['When was the Eiffel Tower constructed?', 'The Eiffel Tower was constructed in 2000']], columns=['prompt', 'context']),
+        pd.DataFrame([
+            ('When were the Pyramids constructed?', 'The Pyramids were constructed in 1930', '1930'),
+            ('When was the Earth constructed?', 'The Earth was constructed in 2013', '2013'),
+        ], columns=['prompt', 'context', 'label']),
+        output_dir='cache/changed_dir_parse')
+    assert len(results) == 1
+    assert 'tailwiz_label' in results.columns
+    assert type(results.tailwiz_label.iloc[0]) == str

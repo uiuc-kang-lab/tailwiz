@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from .task import Task
 
 class GenerateTask(Task):
-    def __init__(self, train, val, test):
+    def __init__(self, train, val, test, **override_train_args):
         self.num_steps = 2 if train is None else 3
         print(f'\n(1/{self.num_steps}) PROCESSING DATA...\n')
         (
@@ -20,6 +20,7 @@ class GenerateTask(Task):
             self.test_dataset
         ) = self._load_data(train, val, test)
         self.model = self._load_model()
+        self.override_train_args = override_train_args
 
     def _load_data(self, train, val, test):
         self.tokenizer = transformers.T5Tokenizer.from_pretrained('google/flan-t5-base', cache_dir='cache/flan-t5')
@@ -66,19 +67,19 @@ class GenerateTask(Task):
             def __getitem__(self, index):
                 return {k: self.data[k][index] for k in self.data.keys()}
 
-        args = transformers.Seq2SeqTrainingArguments(
-            'cache/flan-t5',
-            num_train_epochs=7,
-            # per_device_train_batch_size=1,
-            evaluation_strategy='epoch',
-            save_strategy='no',
-            #load_best_model_at_end=True,
-            predict_with_generate=True,
-            metric_for_best_model='eval_loss',
-            logging_steps=1,
-            no_cuda=(not torch.cuda.is_available()),
-            use_mps_device=(torch.backends.mps.is_available() and not torch.cuda.is_available()),
-        )
+        args_dict = {
+            'output_dir': 'cache/flan-t5',
+            'num_train_epochs': 7,
+            'evaluation_strategy': 'epoch',
+            'save_strategy': 'no',
+            'predict_with_generate': True,
+            'metric_for_best_model': 'eval_loss',
+            'logging_steps': 1,
+            'no_cuda': (not torch.cuda.is_available()),
+            'use_mps_device': (torch.backends.mps.is_available() and not torch.cuda.is_available()),
+        }
+        args_dict.update(self.override_train_args)
+        args = transformers.Seq2SeqTrainingArguments(**args_dict)
         trainer = transformers.Seq2SeqTrainer(
             model=self.model,
             args=args,
@@ -114,7 +115,7 @@ class GenerateTask(Task):
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
-def generate(to_generate, labeled_examples=None, output_metrics=False):
+def generate(to_generate, labeled_examples=None, output_metrics=False, **override_train_args):
     assert isinstance(to_generate, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
     assert 'prompt' in to_generate.columns, \
         'Make sure the prompt column in your pandas DataFrame is named "prompt".'
@@ -126,12 +127,12 @@ def generate(to_generate, labeled_examples=None, output_metrics=False):
         assert labeled_examples is not None, 'In order to output an estimate of performance with output_metrics, labeled_examples must be provided.'
 
     if labeled_examples is None:
-        generate_task_out = GenerateTask(None, None, to_generate)
+        generate_task_out = GenerateTask(None, None, to_generate, **override_train_args)
         pred_results = generate_task_out.predict()
     else:
         assert len(labeled_examples) >= 2, 'At least 2 rows of prelabeled data must be given.'
         train, val = train_test_split(labeled_examples, test_size=0.2)
-        generate_task_out = GenerateTask(train, val, to_generate)
+        generate_task_out = GenerateTask(train, val, to_generate, **override_train_args)
         generate_task_out.train()
         pred_results = generate_task_out.predict()
     

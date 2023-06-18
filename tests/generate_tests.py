@@ -52,3 +52,15 @@ def test_generate_with_metrics():
     assert metrics is not None
     assert 'rouge1' in metrics
     assert type(metrics['rouge1']) == float
+
+
+def test_generate_override_train_args():
+    results = tailwiz.generate(
+        pd.DataFrame(['Is this sentence Happy or Sad? I am crying my eyes out.'], columns=['prompt']),
+        pd.DataFrame([
+            ['Is this sentence Happy or Sad? I love puppies!', 'Happy'],
+            ['Is this sentence Happy or Sad? I do not like you at all.', 'Sad'],
+        ], columns=['prompt', 'label']),
+        output_dir='cache/changed_dir_generate')
+    assert len(results) == 1
+    assert type(results.tailwiz_label.iloc[0]) == str

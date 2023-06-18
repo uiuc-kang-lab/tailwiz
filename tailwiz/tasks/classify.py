@@ -14,20 +14,17 @@ from .task import Task
 
 
 class ClassificationTask(Task):
-    def __init__(self, train, val, test):
+    def __init__(self, train, val, test, **override_train_args):
         print(f'\n(1/3) PROCESSING DATA...\n')
         (
-            # self.train_embeds,
             self.train_embeds_probe,
             self.train_labels,
-            # self.val_embeds,
             self.val_embeds_probe,
             self.val_labels,
-            # self.test_embeds,
             self.test_embeds_probe,
         ) = self._load_data(train, val, test)
 
-        self.model = self._load_model()
+        self.override_train_args = override_train_args
         self.model_probe = self._load_model()
     
     def _load_data(self, train, val, test):
@@ -71,18 +68,10 @@ class ClassificationTask(Task):
             # Embed.
             with torch.no_grad():
                 outputs = [embed_model(input_tensor.to(device)) for input_tensor in input_tensors[:1]]  
-                
-                # hidden_states = outputs[0].last_hidden_state.mean(1).squeeze().cpu()
-                # hidden_states = torch.stack([output.last_hidden_state.mean(1) for output in outputs], 0).mean(0).cpu()
                 hidden_states_probe = torch.stack([torch.concat(output.hidden_states, 0).mean(1) for output in outputs], 0).mean(0).cpu() # Mean over seq len (1) and over wrapped sequences (0).
-
-                # embeds.append(hidden_states)
                 embeds_probe.append(hidden_states_probe)
 
-        # embeds = torch.stack(embeds, 0)
         embeds_probe = torch.stack(embeds_probe, 0)
-        
-        # embeds = embeds.view(embeds.shape[0], -1)
         embeds_probe = embeds_probe.view(embeds_probe.shape[0], -1)
 
         if is_overlapped:
@@ -97,13 +86,10 @@ under 300 words per text.
 
 ***
 ''')
-        # train_embeds = embeds[:len(train)] if train is not None else []
         train_embeds_probe = embeds_probe[:len(train)] if train is not None else []
         train_labels = train.label.tolist() if train is not None else []
-        # val_embeds = embeds[len(train_embeds):len(train_embeds) + len(val)] if val is not None else []
         val_embeds_probe = embeds_probe[len(train_embeds_probe):len(train_embeds_probe) + len(val)] if val is not None else []
         val_labels = val.label.tolist() if val is not None else []
-        # test_embeds = embeds[len(train_embeds) + len(val_embeds):]
         test_embeds_probe = embeds_probe[len(train_embeds_probe) + len(val_embeds_probe):]
 
         self.classes = list(set(train_labels + val_labels))
@@ -120,37 +106,35 @@ under 300 words per text.
             val_labels = binarize_labels(val_labels, self.classes)
 
         return (
-            # train_embeds, 
             train_embeds_probe, 
             train_labels, 
-            # val_embeds, 
             val_embeds_probe, 
             val_labels, 
-            # test_embeds, 
             test_embeds_probe
         )
 
     def _load_model(self):
-        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(random_state=0, max_iter=10000, class_weight='balanced'))
+        args_dict = {
+            'random_state': 0,
+            'max_iter': 10000,
+            'class_weight': 'balanced'
+        }
+        args_dict.update(self.override_train_args)
+        return multiclass.OneVsRestClassifier(linear_model.LogisticRegression(**args_dict))
     
     def train(self):
         print(f'\n(2/3) LEARNING...\n')
-        # self.model.fit(self.train_embeds, self.train_labels)
         self.model_probe.fit(self.train_embeds_probe, self.train_labels)
 
     def evaluate(self):
         if len(self.val_embeds_probe) == 0:
             return None
-
-        # val_preds = self.model.predict(self.val_embeds)
-        # val_probs = self.model.predict_proba(self.val_embeds)
         
         val_preds_probe = self.model_probe.predict(self.val_embeds_probe)
         val_probs_probe = self.model_probe.predict_proba(self.val_embeds_probe)
 
         # Get one-vs-all classification metrics for each class.
         print('\nGETTING METRICS...\n')
-        print("HIIIIIIIBAOEIFOWIEJFOEWIJFOEIJF")
         def get_metrics(preds, probs):
             accs = {}
             precs = {}
@@ -184,46 +168,21 @@ under 300 words per text.
                 'auroc': aurocs,
                 'aupr': auprs,
             }
-        
-        # metrics_noprobe = get_metrics(val_preds, val_probs)
+
         metrics_probe = get_metrics(val_preds_probe, val_probs_probe)
-
-        # print('NO PROBE', metrics_noprobe)
-        # print('PROBE', metrics_probe)
-
-        # if 1 in metrics_noprobe['f1']:
-        #     if metrics_noprobe['f1'][1] > metrics_probe['f1'][1]:
-        #         self.better_model = self.model
-        #         self.better_model_test_embeds = self.test_embeds
-        #         return metrics_noprobe
-        #     else:
-        #         self.better_model = self.model_probe
-        #         self.better_model_test_embeds = self.test_embeds_probe
-        #         return metrics_probe
-        # else:
-        #     if sum(metrics_noprobe['f1'].values()) > sum(metrics_probe['f1'].values()):
-        #         self.better_model = self.model
-        #         self.better_model_test_embeds = self.test_embeds
-        #         return metrics_noprobe
-        #     else:
-        #         self.better_model = self.model_probe
-        #         self.better_model_test_embeds = self.test_embeds_probe
-        #         return metrics_probe
-        self.better_model = self.model_probe
-        self.better_model_test_embeds = self.test_embeds_probe
         return metrics_probe
     
     def predict(self):
         print(f'\n(3/3) CREATING TAILWIZ LABELS...\n')
         out_predictions = []
-        for i in tqdm.tqdm(range(self.better_model_test_embeds.shape[0])):
-            prediction = self.better_model.predict(self.better_model_test_embeds[i].unsqueeze(0))
+        for i in tqdm.tqdm(range(self.test_embeds_probe.shape[0])):
+            prediction = self.model_probe.predict(self.test_embeds_probe[i].unsqueeze(0))
             class_i = np.argmax(prediction[0])
             out_predictions.append(self.classes[class_i])
         return out_predictions
 
 
-def classify(to_classify, labeled_examples=None, output_metrics=False):
+def classify(to_classify, labeled_examples=None, output_metrics=False, **override_train_args):
     assert isinstance(to_classify, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
     assert 'text' in to_classify.columns, 'Make sure the text column in your pandas DataFrame is named "text".'
 
@@ -245,7 +204,7 @@ def classify(to_classify, labeled_examples=None, output_metrics=False):
             split_attempt += 1
             continue
         else:
-            classify_task_out = ClassificationTask(train, val, to_classify)
+            classify_task_out = ClassificationTask(train, val, to_classify, **override_train_args)
             classify_task_out.train()
             break
     

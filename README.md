@@ -58,13 +58,15 @@ python -m pip install --upgrade tailwiz
 In this section, we outline the three main functions of `tailwiz` and provide examples.
 
 
-### <code>tailwiz.classify<i>(to_classify, labeled_examples=None, output_metrics=False)</i></code>
+### <code>tailwiz.classify<i>(to_classify, labeled_examples, output_metrics=False)</i></code>
 
 Given text, classify the text.
 #### Parameters:
 - `to_classify` : _pandas.DataFrame_ with a column named `'text'` (`str`). Text to be classified.
-- `labeled_examples` : _pandas.DataFrame_ with columns named `'text'` (`str`) and `'label'` (`str`, `int`), _default None_. Labeled examples to enhance the performance of the classification task. The classified text is in the `'text'` column and the text's labels are in the `'label'` column.
+- `labeled_examples` : _pandas.DataFrame_ with columns named `'text'` (`str`) and `'label'` (`str`, `int`). Labeled examples to enhance the performance of the classification task. The classified text is in the `'text'` column and the text's labels are in the `'label'` column.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
+
+Any additional keyword arguments will override `tailwiz.classify`'s training arguments, specifically scikit-learn's [`LogisticRegression`](https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html) parameters.
 
 #### Returns:
 - `results` : _pandas.DataFrame_. A copy of `to_classify` with a new column, `'tailwiz_label'`, containing classification results.
@@ -103,6 +105,8 @@ Given a prompt and a context, parse the answer from the context.
 - `labeled_examples` : _pandas.DataFrame_ with columns named `'context'` (`str`), `'prompt'` (`str`), and `'label'` (`str`), _default None_. Labeled examples to enhance the performance of the parsing task. The labels in `'label'` must be extracted *exactly* from the contexts in `'context'` (as whole words) according to the prompts in `'prompt'`.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
 
+Any additional keyword arguments will override `tailwiz.parse`'s training arguments, specifically Hugging Face's [`TrainingArguments`](https://huggingface.co/docs/transformers/v4.30.0/en/main_classes/trainer#transformers.TrainingArguments) parameters.
+
 #### Returns:
 - `results` : _pandas.DataFrame_. A copy of `to_parse` with a new column, `'tailwiz_label'`, containing parsed results.
 - `performance_estimate` : _Dict[str, float]_. Dictionary of metric name to metric value mappings. Included together with results in a tuple if `output_metrics` is True. Uses `labeled_examples` to give an estimate of the accuracy of the parsing job.
@@ -139,6 +143,8 @@ Given a prompt, generate an answer.
 - `to_generate` : _pandas.DataFrame_ with a column named `'prompt'` (`str`). Prompts according to which labels will generated.
 - `labeled_examples` : _pandas.DataFrame_ with columns named `'prompt'` (`str`) and `'label'` (`str`), _default None_. Labeled examples to enhance the performance of the parsing task. The labels in `'label'` should be responses to the prompts in `'prompt'`.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
+
+Any additional keyword arguments will override `tailwiz.generate`'s training arguments, specifically Hugging Face's [`TrainingArguments`](https://huggingface.co/docs/transformers/v4.30.0/en/main_classes/trainer#transformers.TrainingArguments) parameters.
 
 #### Returns:
 - `results` : _pandas.DataFrame_. A copy of `to_generate` with a new column, `'tailwiz_label'`, containing generated results.

@@ -74,3 +74,14 @@ def test_classify_multi_with_metrics():
     assert 'acc' in metrics
     assert type(metrics['acc']) == dict
     assert type(metrics['acc'][0]) == float
+
+
+def test_classify_override_train_args():
+    results = tailwiz.classify(
+        pd.DataFrame(['I hate you'], columns=['text']),
+        pd.DataFrame([['You are ugly', 0], ['Lovely weather today!', 1], ['Everything sucks', 0]], columns=['text', 'label']),
+        verbose=1
+    )
+    assert 'tailwiz_label' in results.columns
+    assert len(results) == 1
+    assert results.tailwiz_label.iloc[0] in (0, 1)
