@@ -144,7 +144,7 @@ Given a prompt, generate an answer.
 - `labeled_examples` : _pandas.DataFrame_ with columns named `'prompt'` (`str`) and `'label'` (`str`), _default None_. Labeled examples to enhance the performance of the parsing task. The labels in `'label'` should be responses to the prompts in `'prompt'`.
 - `output_metrics` : _bool, default False_. Whether to output `performance_estimate` together with results in a tuple.
 
-Any additional keyword arguments will override `tailwiz.generate`'s training arguments, specifically Hugging Face's [`TrainingArguments`](https://huggingface.co/docs/transformers/v4.30.0/en/main_classes/trainer#transformers.TrainingArguments) parameters.
+Any additional keyword arguments will override `tailwiz.generate`'s training arguments, specifically Hugging Face's [`Seq2SeqTrainingArguments`](https://huggingface.co/docs/transformers/main_classes/trainer#transformers.Seq2SeqTrainingArguments) parameters.
 
 #### Returns:
 - `results` : _pandas.DataFrame_. A copy of `to_generate` with a new column, `'tailwiz_label'`, containing generated results.
