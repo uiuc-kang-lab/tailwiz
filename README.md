@@ -78,7 +78,11 @@ Any additional keyword arguments will override `tailwiz.classify`'s training arg
 import tailwiz
 import pandas as pd
 
-labeled_examples = pd.DataFrame(
+df_to_classify = pd.DataFrame(
+    ['Have a great day', 'I hate you'],
+    columns=['text'],
+)
+df_labeled_examples = pd.DataFrame(
     [
         ['You make me vomit', 'mean'],
         ['Love you lots', 'nice'],
@@ -86,13 +90,9 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['text', 'label'],
 )
-to_classify = pd.DataFrame(
-    ['Have a great day', 'I hate you'],
-    columns=['text'],
-)
 results = tailwiz.classify(
-    to_classify,
-    labeled_examples=labeled_examples,
+    to_classify=df_to_classify,
+    labeled_examples=df_labeled_examples,
 )
 print(results)
 ```
@@ -116,7 +116,11 @@ Any additional keyword arguments will override `tailwiz.parse`'s training argume
 import tailwiz
 import pandas as pd
 
-labeled_examples = pd.DataFrame(
+df_to_parse = pd.DataFrame(
+    [['Extract the money.', 'Try to save at least £10']],
+    columns=['prompt', 'context'],
+)
+df_labeled_examples = pd.DataFrame(
     [
         ['Extract the money.', 'He owed me $100', '$100'],
         ['Extract the money.', '¥5000 bills are common', '¥5000'],
@@ -124,13 +128,9 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['prompt', 'context', 'label'],
 )
-to_parse = pd.DataFrame(
-    [['Extract the money.', 'Try to save at least £10']],
-    columns=['prompt', 'context'],
-)
 results = tailwiz.parse(
-    to_parse,
-    labeled_examples=labeled_examples,
+    to_parse=df_to_parse,
+    labeled_examples=df_labeled_examples,
 )
 print(results)
 ```
@@ -155,7 +155,11 @@ Any additional keyword arguments will override `tailwiz.generate`'s training arg
 import tailwiz
 import pandas as pd
 
-labeled_examples = pd.DataFrame(
+df_to_generate = pd.DataFrame(
+    ['Label this sentence as "positive" or "negative": I am crying my eyes out.'],
+    columns=['prompt']
+)
+df_labeled_examples = pd.DataFrame(
     [
         ['Label this sentence as "positive" or "negative": I love puppies!', 'positive'],
         ['Label this sentence as "positive" or "negative": I do not like you at all.', 'negative'],
@@ -163,13 +167,9 @@ labeled_examples = pd.DataFrame(
     ],
     columns=['prompt', 'label']
 )
-to_generate = pd.DataFrame(
-    ['Label this sentence as "positive" or "negative": I am crying my eyes out.'],
-    columns=['prompt']
-)
 results = tailwiz.generate(
-    to_generate,
-    labeled_examples=labeled_examples,
+    to_generate=df_to_generate,
+    labeled_examples=df_labeled_examples,
 )
 print(results)
 ```

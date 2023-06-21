@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='tailwiz',
-    version='0.0.22',
+    version='0.0.23',
     description='',
     long_description=long_description,
     long_description_content_type='text/markdown',
