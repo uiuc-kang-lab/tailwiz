@@ -180,3 +180,7 @@ Use these Jupyter Notebook examples as templates to help load your data and run 
 - For an example of `tailwiz.classify`, see [`examples/classify.ipynb`](https://github.com/timothydai/tailwiz/blob/main/examples/classify.ipynb)
 - For an example of `tailwiz.parse`, see [`examples/parse.ipynb`](https://github.com/timothydai/tailwiz/blob/main/examples/parse.ipynb)
 - For an example of `tailwiz.generate`, see [`examples/generate.ipynb`](https://github.com/timothydai/tailwiz/blob/main/examples/generate.ipynb)
+
+
+## Contact
+Please contact Daniel Kang (ddkang [at] g.illinois.edu) and Timothy Dai (timdai [at] stanford.edu) if you decide to use `tailwiz`. 
