@@ -182,7 +182,7 @@ under 300 words per text.
         return out_predictions
 
 
-def classify(to_classify, labeled_examples=None, output_metrics=False, **override_train_args):
+def classify(to_classify, labeled_examples=None, output_metrics=False, data_split_seed=None, **override_train_args):
     assert isinstance(to_classify, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
     assert 'text' in to_classify.columns, 'Make sure the text column in your pandas DataFrame is named "text".'
 
@@ -198,7 +198,7 @@ def classify(to_classify, labeled_examples=None, output_metrics=False, **overrid
     classify_task_out = None
     split_attempt = 0
     while split_attempt < 10:
-        train, val = sklearn.model_selection.train_test_split(labeled_examples, test_size=0.2, random_state=0)
+        train, val = sklearn.model_selection.train_test_split(labeled_examples, test_size=0.2, random_state=data_split_seed)
         num_unique_classes_in_train = len(train.label.unique())
         if num_unique_classes_in_train < 2:
             split_attempt += 1

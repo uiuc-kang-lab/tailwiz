@@ -184,7 +184,7 @@ which does not require the labels do be found in the context.''')
         # return self._decode_pos2strs(outputs['start_logits'].argmax(1), outputs['end_logits'].argmax(1), self.test_dataset['input_ids'])
 
 
-def parse(to_parse, labeled_examples=None, output_metrics=False, **override_train_args):
+def parse(to_parse, labeled_examples=None, output_metrics=False, data_split_seed=None, **override_train_args):
     assert isinstance(to_parse, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
     assert 'prompt' in to_parse.columns and 'context' in to_parse.columns, \
         'Make sure the prompt column in your pandas DataFrame is named "prompt" and the context column is named "context".'
@@ -201,7 +201,7 @@ def parse(to_parse, labeled_examples=None, output_metrics=False, **override_trai
         pred_results = parse_task_out.predict()
     else:
         assert len(labeled_examples) >= 2, 'At least 2 rows of prelabeled data must be given.'
-        train, val = train_test_split(labeled_examples, test_size=0.2)
+        train, val = train_test_split(labeled_examples, test_size=0.2, random_state=data_split_seed)
         parse_task_out = ParsingTask(train, val, to_parse, **override_train_args)
         parse_task_out.train()
         pred_results = parse_task_out.predict()

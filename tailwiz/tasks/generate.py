@@ -115,7 +115,7 @@ class GenerateTask(Task):
         return self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
 
-def generate(to_generate, labeled_examples=None, output_metrics=False, **override_train_args):
+def generate(to_generate, labeled_examples=None, output_metrics=False, data_split_seed=None, **override_train_args):
     assert isinstance(to_generate, pd.DataFrame), 'Make sure you are passing in pandas DataFrames.'
     assert 'prompt' in to_generate.columns, \
         'Make sure the prompt column in your pandas DataFrame is named "prompt".'
@@ -131,7 +131,7 @@ def generate(to_generate, labeled_examples=None, output_metrics=False, **overrid
         pred_results = generate_task_out.predict()
     else:
         assert len(labeled_examples) >= 2, 'At least 2 rows of prelabeled data must be given.'
-        train, val = train_test_split(labeled_examples, test_size=0.2)
+        train, val = train_test_split(labeled_examples, test_size=0.2, random_state=data_split_seed)
         generate_task_out = GenerateTask(train, val, to_generate, **override_train_args)
         generate_task_out.train()
         pred_results = generate_task_out.predict()
